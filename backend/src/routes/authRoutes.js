@@ -1,0 +1,149 @@
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const store = require('../services/store');
+const { protect } = require('../middleware/auth');
+
+const router = express.Router();
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
+    expiresIn: '30d',
+  });
+};
+
+// Seed default users if empty (for instant testing)
+async function seedDefaultUsers() {
+  const existingBoss = await store.findUserByEmail('boss@villagecoders.com');
+  if (!existingBoss) {
+    const salt = await bcrypt.genSalt(10);
+    const passBoss = await bcrypt.hash('admin123', salt);
+    const passDev = await bcrypt.hash('dev1234', salt);
+
+    const boss = await store.createUser({
+      name: 'Village Lead',
+      email: 'lead@villagecoders.com',
+      password: passBoss,
+      role: 'Boss',
+      title: 'Head of Engineering',
+    });
+
+    const dev = await store.createUser({
+      name: 'Alex Rivera',
+      email: 'dev@villagecoders.com',
+      password: passDev,
+      role: 'Member',
+      title: 'Full Stack Engineer',
+    });
+
+    // Create a demo task
+    await store.createTask({
+      title: 'Integrate Real-time WebSocket Status Alerts',
+      description: 'Review task status updates and connect live UI notifications for the lead.',
+      priority: 'High',
+      deadline: new Date(Date.now() + 86400000).toISOString(),
+      assignedTo: dev._id || dev.id,
+      assignedBy: boss._id || boss.id,
+    });
+  }
+}
+
+// @route   POST /api/auth/register
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password, role, title } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide name, email, and password' });
+    }
+
+    const userExists = await store.findUserByEmail(email);
+    if (userExists) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await store.createUser({
+      name,
+      email,
+      password: hashedPassword,
+      role: role === 'Boss' ? 'Boss' : 'Member',
+      title: title || (role === 'Boss' ? 'Technical Lead' : 'Developer'),
+    });
+
+    const token = generateToken(user._id || user.id);
+
+    res.status(201).json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server registration error' });
+  }
+});
+
+// @route   POST /api/auth/login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+    }
+
+    let user = await store.findUserByEmail(email);
+    if (!user) {
+      // Auto-seed if first time running demo
+      await seedDefaultUsers();
+      user = await store.findUserByEmail(email);
+    }
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    const { password: _, ...safeUser } = user;
+    const token = generateToken(user._id || user.id);
+
+    res.json({
+      success: true,
+      token,
+      user: safeUser,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server login error' });
+  }
+});
+
+// @route   GET /api/auth/me
+router.get('/me', protect, async (req, res) => {
+  res.json({
+    success: true,
+    user: req.user,
+  });
+});
+
+// @route   GET /api/auth/users
+router.get('/users', protect, async (req, res) => {
+  try {
+    const users = await store.getAllUsers();
+    res.json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to retrieve team members' });
+  }
+});
+
+module.exports = router;

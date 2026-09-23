@@ -1,0 +1,11 @@
+console.log('1. Checking express...');
+require('./backend/node_modules/express');
+console.log('2. Checking cors...');
+require('./backend/node_modules/cors');
+console.log('3. Checking jsonwebtoken...');
+require('./backend/node_modules/jsonwebtoken');
+console.log('4. Checking bcryptjs...');
+require('./backend/node_modules/bcryptjs');
+console.log('5. Checking mongoose...');
+require('./backend/node_modules/mongoose');
+console.log('6. All backend dependencies OK!');

@@ -1,0 +1,14 @@
+{
+  "name": "village-coders-todo",
+  "version": "1.0.0",
+  "description": "Village Coders Task & Todo App with separated frontend and backend",
+  "scripts": {
+    "start": "node start-dev.js",
+    "dev": "node start-dev.js",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev"
+  },
+  "keywords": ["todo", "village-coders", "react", "express", "mongodb"],
+  "author": "Village Coders",
+  "license": "ISC"
+}
