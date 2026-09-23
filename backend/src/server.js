@@ -19,6 +19,22 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    appName: 'Village Coders Todo API',
+    message: 'Backend server is running smoothly on Render',
+    health: '/api/health',
+    endpoints: {
+      auth: '/api/auth',
+      tasks: '/api/tasks',
+      health: '/api/health',
+    },
+    time: new Date().toISOString(),
+  });
+});
+
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
@@ -29,6 +45,15 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     appName: 'Village Coders Todo API',
     time: new Date().toISOString(),
+  });
+});
+
+// 404 handler (prevents Express default HTML 404 that injects Content-Security-Policy: default-src 'none')
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    status: 404,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
