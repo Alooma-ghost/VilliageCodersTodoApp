@@ -2,26 +2,46 @@ const nodemailer = require('nodemailer');
 
 // Only create a transporter if credentials are configured
 let transporter = null;
+let hasLoggedConfigWarning = false;
 
 function getTransporter() {
   if (transporter) return transporter;
 
-  const { EMAIL_USER, EMAIL_PASS } = process.env;
-  if (!EMAIL_USER || !EMAIL_PASS) return null;
+  const { EMAIL_USER, EMAIL_PASS, SMTP_HOST, SMTP_PORT, SMTP_SECURE } = process.env;
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    if (!hasLoggedConfigWarning) {
+      console.warn('⚠️ [EmailService] EMAIL_USER or EMAIL_PASS not set in environment. Email notifications will be skipped.');
+      console.warn('💡 Tip: Add EMAIL_USER=your_email@gmail.com and EMAIL_PASS=your_16_digit_app_password to .env');
+      hasLoggedConfigWarning = true;
+    }
+    return null;
+  }
 
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
+  try {
+    if (SMTP_HOST) {
+      transporter = nodemailer.createTransport({
+        host: SMTP_HOST,
+        port: Number(SMTP_PORT) || 587,
+        secure: SMTP_SECURE === 'true' || SMTP_PORT === '465',
+        auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+      });
+    }
+    console.log('✅ [EmailService] Nodemailer transporter initialized for:', EMAIL_USER);
+  } catch (err) {
+    console.error('❌ [EmailService] Failed to initialize nodemailer transporter:', err.message);
+    return null;
+  }
 
   return transporter;
 }
 
 const fromName = () => process.env.EMAIL_FROM_NAME || 'Village Coders';
-const fromAddress = () => process.env.EMAIL_USER || 'noreply@villagecoders.com';
+const fromAddress = () => process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@villagecoders.com';
 
 function priorityColor(priority) {
   const colors = { Urgent: '#ef4444', High: '#f97316', Medium: '#0891b2', Low: '#22c55e' };
@@ -99,14 +119,23 @@ async function sendTaskAssignedEmail(task, assignee, assigner) {
     <p style="color:#94a3b8;font-size:14px;margin:0;">Log in to the app to accept, begin, or update the status of this task.</p>
   `;
 
-  await t.sendMail({
-    from: `"${fromName()}" <${fromAddress()}>`,
-    to: `"${assignee.name}" <${assignee.email}>`,
-    subject: `New Task Assigned: ${task.title}`,
-    html: emailTemplate({ title: `New Task: ${task.title}`, preheader: `${assigner.name} assigned you: ${task.title}`, body }),
-  });
+  if (!assignee || !assignee.email) {
+    console.warn(`[EmailService] Cannot send task assigned email: Assignee email is missing.`);
+    return;
+  }
 
-  console.log(`Email sent to ${assignee.email} — task assigned`);
+  try {
+    const info = await t.sendMail({
+      from: `"${fromName()}" <${fromAddress()}>`,
+      to: `"${assignee.name || 'Team Member'}" <${assignee.email}>`,
+      subject: `New Task Assigned: ${task.title}`,
+      html: emailTemplate({ title: `New Task: ${task.title}`, preheader: `${assigner?.name || 'Team Lead'} assigned you: ${task.title}`, body }),
+    });
+
+    console.log(`✅ [EmailService] Task assigned email sent to ${assignee.email} (MessageId: ${info.messageId})`);
+  } catch (err) {
+    console.error(`❌ [EmailService] Failed to send email to ${assignee.email}:`, err.message);
+  }
 }
 
 async function sendTaskStatusEmail(task, assignee, assigner, newStatus) {
@@ -143,14 +172,18 @@ async function sendTaskStatusEmail(task, assignee, assigner, newStatus) {
     ${isBlocked ? `<p style="color:#fca5a5;font-size:14px;margin:0;"><strong>Action required:</strong> This task is blocked. Please log in to reassign or resolve the blocker.</p>` : `<p style="color:#94a3b8;font-size:14px;margin:0;">Log in to the task board to view the full details.</p>`}
   `;
 
-  await t.sendMail({
-    from: `"${fromName()}" <${fromAddress()}>`,
-    to: `"${assigner.name}" <${assigner.email}>`,
-    subject: `${label}: "${task.title}"`,
-    html: emailTemplate({ title: `${label}: ${task.title}`, preheader: `${assignee.name} updated "${task.title}" to ${newStatus}`, body }),
-  });
+  try {
+    const info = await t.sendMail({
+      from: `"${fromName()}" <${fromAddress()}>`,
+      to: `"${assigner.name || 'Team Lead'}" <${assigner.email}>`,
+      subject: `${label}: "${task.title}"`,
+      html: emailTemplate({ title: `${label}: ${task.title}`, preheader: `${assignee?.name || 'Assignee'} updated "${task.title}" to ${newStatus}`, body }),
+    });
 
-  console.log(`Email sent to ${assigner.email} — status: ${newStatus}`);
+    console.log(`✅ [EmailService] Status email sent to ${assigner.email} (MessageId: ${info.messageId})`);
+  } catch (err) {
+    console.error(`❌ [EmailService] Failed to send status email to ${assigner.email}:`, err.message);
+  }
 }
 
 module.exports = { sendTaskAssignedEmail, sendTaskStatusEmail };

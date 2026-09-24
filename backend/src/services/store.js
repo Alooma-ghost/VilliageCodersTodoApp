@@ -248,6 +248,20 @@ async function getTaskById(id) {
   return db.tasks.find((t) => t._id === id) || null;
 }
 
+async function clearAllData() {
+  if (isMongoLive()) {
+    try {
+      await User.deleteMany({});
+      await Task.deleteMany({});
+    } catch (e) {
+      console.error('Error clearing Mongo collections:', e.message);
+    }
+  }
+  const empty = { users: [], tasks: [] };
+  saveLocalDB(empty);
+  return { success: true, message: 'All test users and tasks cleared successfully' };
+}
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -259,5 +273,6 @@ module.exports = {
   updateTaskStatus,
   updateTask,
   deleteTask,
+  clearAllData,
   isMongoLive,
 };

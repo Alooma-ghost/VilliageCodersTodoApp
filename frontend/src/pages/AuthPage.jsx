@@ -15,6 +15,14 @@ export default function AuthPage({ onAuthSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail) || cleanEmail.includes('..')) {
+      setError('Please enter a valid email address (e.g. yourname@domain.com)');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -22,14 +30,14 @@ export default function AuthPage({ onAuthSuccess }) {
       if (isRegister) {
         data = await authAPI.register({
           name: name.trim(),
-          email: email.trim(),
+          email: cleanEmail,
           password,
           role,
           title: title.trim() || (role === 'Boss' ? 'Technical Lead' : 'Developer'),
         });
       } else {
         data = await authAPI.login({
-          email: email.trim(),
+          email: cleanEmail,
           password,
         });
       }
@@ -103,7 +111,6 @@ export default function AuthPage({ onAuthSuccess }) {
                       <ShieldCheck size={22} />
                     </div>
                     <span className="role-title">Team Lead</span>
-                    <span className="role-desc">Assigns, oversees, & resolves roadblocks</span>
                   </div>
 
                   <div
@@ -114,7 +121,6 @@ export default function AuthPage({ onAuthSuccess }) {
                       <UserCheck size={22} />
                     </div>
                     <span className="role-title">Team Member</span>
-                    <span className="role-desc">Executes tasks & reports roadblocks</span>
                   </div>
                 </div>
               </div>
@@ -125,7 +131,6 @@ export default function AuthPage({ onAuthSuccess }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="e.g., Alex O'Connor"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required={isRegister}
@@ -138,7 +143,6 @@ export default function AuthPage({ onAuthSuccess }) {
                 <input
                   type="text"
                   className="form-input"
-                  placeholder={role === 'Boss' ? 'Technical Lead' : 'Frontend Engineer'}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
@@ -151,11 +155,15 @@ export default function AuthPage({ onAuthSuccess }) {
             <input
               type="email"
               className="form-input"
-              placeholder="name@villagecoders.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+            {isRegister && (
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                ✉️ Use a valid, active email address so you can receive task assignments and updates.
+              </span>
+            )}
           </div>
 
           <div className="form-group">
@@ -163,7 +171,6 @@ export default function AuthPage({ onAuthSuccess }) {
             <input
               type="password"
               className="form-input"
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

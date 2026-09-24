@@ -57,10 +57,15 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide name, email, and password' });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    // Strict email regex: requires standard characters, valid domain, and at least a 2-char TLD
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail) || cleanEmail.includes('..')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address (e.g. name@company.com)',
+      });
     }
 
     // Validate password length
@@ -68,7 +73,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const userExists = await store.findUserByEmail(email);
+    const userExists = await store.findUserByEmail(cleanEmail);
     if (userExists) {
       return res.status(400).json({ success: false, message: 'An account with this email already exists' });
     }
@@ -77,11 +82,11 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const user = await store.createUser({
-      name,
-      email,
+      name: name.trim(),
+      email: cleanEmail,
       password: hashedPassword,
       role: role === 'Boss' ? 'Boss' : 'Member',
-      title: title || (role === 'Boss' ? 'Technical Lead' : 'Developer'),
+      title: title ? title.trim() : (role === 'Boss' ? 'Technical Lead' : 'Developer'),
     });
 
     const token = generateToken(user._id || user.id);
@@ -97,6 +102,17 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/reset-database
+// Allows wiping test data from both MongoDB and local storage to start completely afresh
+router.post('/reset-database', async (req, res) => {
+  try {
+    const result = await store.clearAllData();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // @route   POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
@@ -106,12 +122,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    let user = await store.findUserByEmail(email);
-    if (!user) {
-      // Auto-seed if first time running demo
-      await seedDefaultUsers();
-      user = await store.findUserByEmail(email);
-    }
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = await store.findUserByEmail(cleanEmail);
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
