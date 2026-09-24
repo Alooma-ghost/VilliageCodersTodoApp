@@ -12,41 +12,6 @@ const generateToken = (id) => {
   });
 };
 
-// Seed default users if empty (for instant testing)
-async function seedDefaultUsers() {
-  const existingBoss = await store.findUserByEmail('boss@villagecoders.com');
-  if (!existingBoss) {
-    const salt = await bcrypt.genSalt(10);
-    const passBoss = await bcrypt.hash('admin123', salt);
-    const passDev = await bcrypt.hash('dev1234', salt);
-
-    const boss = await store.createUser({
-      name: 'Village Lead',
-      email: 'lead@villagecoders.com',
-      password: passBoss,
-      role: 'Boss',
-      title: 'Head of Engineering',
-    });
-
-    const dev = await store.createUser({
-      name: 'Alex Rivera',
-      email: 'dev@villagecoders.com',
-      password: passDev,
-      role: 'Member',
-      title: 'Full Stack Engineer',
-    });
-
-    // Create a demo task
-    await store.createTask({
-      title: 'Integrate Real-time WebSocket Status Alerts',
-      description: 'Review task status updates and connect live UI notifications for the lead.',
-      priority: 'High',
-      deadline: new Date(Date.now() + 86400000).toISOString(),
-      assignedTo: dev._id || dev.id,
-      assignedBy: boss._id || boss.id,
-    });
-  }
-}
 
 // @route   POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -102,12 +67,16 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// @route   POST /api/auth/reset-database
+// @route   ALL /api/auth/reset-database
 // Allows wiping test data from both MongoDB and local storage to start completely afresh
-router.post('/reset-database', async (req, res) => {
+router.all('/reset-database', async (req, res) => {
   try {
     const result = await store.clearAllData();
-    res.json(result);
+    res.json({
+      success: true,
+      message: 'Database wiped clean successfully. All test accounts and tasks have been removed.',
+      ...result,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -119,19 +88,25 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+      return res.status(400).json({ success: false, message: 'Please enter your email and password' });
     }
 
     const cleanEmail = (email || '').trim().toLowerCase();
     const user = await store.findUserByEmail(cleanEmail);
 
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email. Please create an account first.',
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password. Please verify and try again.',
+      });
     }
 
     const { password: _, ...safeUser } = user;

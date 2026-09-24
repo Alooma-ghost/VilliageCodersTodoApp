@@ -17,10 +17,17 @@ export default function App() {
           if (res && res.user) {
             setCurrentUser(res.user);
             setStoredUser(res.user);
+          } else {
+            // Account was deleted/wiped or session expired
+            removeAuthToken();
+            setCurrentUser(null);
           }
+        } else {
+          setCurrentUser(null);
         }
       } catch (e) {
-        console.warn('Session verification fallback', e);
+        removeAuthToken();
+        setCurrentUser(null);
       } finally {
         setInitialChecking(false);
       }
