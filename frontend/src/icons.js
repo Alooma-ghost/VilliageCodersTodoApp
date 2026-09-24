@@ -200,6 +200,23 @@ export const Zap = createIcon('Zap', [
   })
 ]);
 
+export const Bell = createIcon('Bell', [
+  React.createElement('path', { key: '1', d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }),
+  React.createElement('path', { key: '2', d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' })
+]);
+
+export const BellOff = createIcon('BellOff', [
+  React.createElement('path', { key: '1', d: 'M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5' }),
+  React.createElement('path', { key: '2', d: 'M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7' }),
+  React.createElement('path', { key: '3', d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }),
+  React.createElement('line', { key: '4', x1: '2', y1: '2', x2: '22', y2: '22' })
+]);
+
+export const CheckCheck = createIcon('CheckCheck', [
+  React.createElement('path', { key: '1', d: 'M18 6 7 17l-5-5' }),
+  React.createElement('path', { key: '2', d: 'm22 10-7.5 7.5L13 16' })
+]);
+
 export default {
   Plus,
   PlusCircle,
@@ -232,4 +249,7 @@ export default {
   Award,
   Flame,
   Zap,
+  Bell,
+  BellOff,
+  CheckCheck,
 };

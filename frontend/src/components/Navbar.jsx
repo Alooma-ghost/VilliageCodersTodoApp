@@ -1,7 +1,8 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
-export default function Navbar({ user, onLogout, viewMode, setViewMode }) {
+export default function Navbar({ user, onLogout, viewMode, setViewMode, notifications, unreadCount, markAllRead, markOneRead, clearNotification }) {
   const isBoss = user?.role === 'Boss';
   const initial = user?.name ? user.name.charAt(0) : '?';
 
@@ -13,7 +14,6 @@ export default function Navbar({ user, onLogout, viewMode, setViewMode }) {
           alt="Village Coders Logo"
           className="brand-logo-img"
           onError={(e) => {
-            // fallback if logo missing
             e.target.style.display = 'none';
           }}
         />
@@ -21,11 +21,22 @@ export default function Navbar({ user, onLogout, viewMode, setViewMode }) {
           <div className="brand-name">
             Village Coders
           </div>
-          <span className="brand-tagline">Web & Software Developers</span>
+          <span className="brand-tagline">Web &amp; Software Developers</span>
         </div>
       </div>
 
       <div className="header-actions">
+        {/* Notification Bell */}
+        {user && (
+          <NotificationBell
+            notifications={notifications || []}
+            unreadCount={unreadCount || 0}
+            markAllRead={markAllRead}
+            markOneRead={markOneRead}
+            clearNotification={clearNotification}
+          />
+        )}
+
         {/* User Profile Pill */}
         {user && (
           <div className="user-badge" title={`${user.name} (${user.email})`}>

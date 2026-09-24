@@ -1,6 +1,7 @@
 const express = require('express');
 const store = require('../services/store');
 const { protect } = require('../middleware/auth');
+const { sendTaskAssignedEmail, sendTaskStatusEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -53,6 +54,17 @@ router.post('/', async (req, res) => {
       success: true,
       task,
     });
+
+    // Fire-and-forget email notification to the assignee
+    try {
+      const assignee = task.assignedTo;
+      const assigner = task.assignedBy;
+      if (assignee && assigner) {
+        sendTaskAssignedEmail(task, assignee, assigner).catch((e) =>
+          console.error('Email send error (task assigned):', e.message)
+        );
+      }
+    } catch (_) {}
   } catch (error) {
     console.error('Create task error:', error);
     res.status(500).json({ success: false, message: error.message || 'Error creating task' });
@@ -88,6 +100,17 @@ router.patch('/:id/status', async (req, res) => {
       success: true,
       task: updatedTask,
     });
+
+    // Fire-and-forget email to the assigner about the status change
+    try {
+      const assignee = updatedTask.assignedTo;
+      const assigner = updatedTask.assignedBy;
+      if (assignee && assigner) {
+        sendTaskStatusEmail(updatedTask, assignee, assigner, status).catch((e) =>
+          console.error('Email send error (status update):', e.message)
+        );
+      }
+    } catch (_) {}
   } catch (error) {
     console.error('Update status error:', error);
     res.status(500).json({ success: false, message: 'Error updating task status' });

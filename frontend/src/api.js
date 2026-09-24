@@ -1,4 +1,29 @@
-const API_BASE = 'http://localhost:5000/api';
+// Determine API Base URL safely:
+// 1. If running on a deployed website (like Vercel) and VITE_API_URL was set to localhost by mistake,
+//    safely override it with the live Render backend URL.
+// 2. Otherwise use VITE_API_URL if provided, or default to '/api' (proxied by Vite in dev & rewritten by vercel.json in prod).
+const resolveApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  const isBrowser = typeof window !== 'undefined';
+  const isLocalHost = isBrowser && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.startsWith('192.168.') ||
+    window.location.hostname.startsWith('10.')
+  );
+
+  if (envUrl) {
+    const cleanUrl = envUrl.trim().replace(/\/+$/, '');
+    if (!isLocalHost && (cleanUrl.includes('localhost') || cleanUrl.includes('127.0.0.1'))) {
+      return 'https://villiagecoderstodoapp.onrender.com/api';
+    }
+    return cleanUrl;
+  }
+
+  return '/api';
+};
+
+const API_BASE = resolveApiBase();
 
 export const getAuthToken = () => localStorage.getItem('vc_token');
 export const setAuthToken = (token) => localStorage.setItem('vc_token', token);

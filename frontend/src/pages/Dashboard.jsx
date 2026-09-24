@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { taskAPI, authAPI } from '../api';
+import useNotifications from '../hooks/useNotifications';
 import Navbar from '../components/Navbar';
 import StatsCards from '../components/StatsCards';
 import TaskFilters from '../components/TaskFilters';
@@ -14,6 +15,14 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Notification system
+  const { notifications, unreadCount, addNotification, markAllRead, markOneRead, clearNotification } =
+    useNotifications(user?._id || user?.id);
+
+  // Track known task IDs to detect newly assigned tasks via polling
+  const knownTaskIds = useRef(new Set());
+  const pollingRef = useRef(null);
+
   // Filtering states
   const [activeTab, setActiveTab] = useState('all'); // all, assignedToMe, assignedByMe, blocked
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,27 +35,55 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
   const [selectedTaskForCannotDo, setSelectedTaskForCannotDo] = useState(null);
 
   // Fetch team members and tasks
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError('');
       const [tasksRes, usersRes] = await Promise.all([
         taskAPI.getTasks(),
         authAPI.getUsers(),
       ]);
 
-      setTasks(tasksRes.tasks || []);
+      const fetchedTasks = tasksRes.tasks || [];
+      const myId = user?._id || user?.id;
+
+      // Check for newly assigned tasks (polling detection)
+      if (knownTaskIds.current.size > 0) {
+        fetchedTasks.forEach((task) => {
+          if (
+            !knownTaskIds.current.has(task._id) &&
+            (task.assignedTo?._id === myId || task.assignedTo === myId)
+          ) {
+            const assigner = task.assignedBy;
+            addNotification({
+              type: 'task_assigned',
+              taskId: task._id,
+              title: 'New Task Assigned',
+              message: `${assigner?.name || 'Someone'} assigned you: "${task.title}"`,
+            });
+          }
+        });
+      }
+
+      // Update known IDs set
+      knownTaskIds.current = new Set(fetchedTasks.map((t) => t._id));
+
+      setTasks(fetchedTasks);
       setTeamMembers(usersRes.users || []);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
-      setError(err.message || 'Error connecting to Village Coders server.');
+      if (!silent) setError(err.message || 'Error connecting to Village Coders server.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
+
+    // Poll every 30 seconds to pick up tasks assigned by other members
+    pollingRef.current = setInterval(() => loadData(true), 30000);
+    return () => clearInterval(pollingRef.current);
   }, []);
 
   // Handle task status transitions
@@ -78,7 +115,21 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
   // Create new task
   const handleCreateTask = async (taskData) => {
     const res = await taskAPI.createTask(taskData);
-    setTasks((prev) => [res.task, ...prev]);
+    const newTask = res.task;
+    setTasks((prev) => [newTask, ...prev]);
+    knownTaskIds.current.add(newTask._id);
+
+    // Notify if you assigned the task to yourself
+    const myId = user?._id || user?.id;
+    const assignedToId = newTask.assignedTo?._id || newTask.assignedTo;
+    if (assignedToId === myId) {
+      addNotification({
+        type: 'task_assigned',
+        taskId: newTask._id,
+        title: 'Task Assigned to You',
+        message: `You assigned yourself: "${newTask.title}"`,
+      });
+    }
   };
 
   // Delete task
@@ -139,6 +190,11 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
           onLogout={onLogout}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          markAllRead={markAllRead}
+          markOneRead={markOneRead}
+          clearNotification={clearNotification}
         />
 
         {/* Main Content Body */}

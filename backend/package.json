@@ -7,7 +7,12 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"
   },
-  "keywords": ["todo", "task-management", "express", "mongodb"],
+  "keywords": [
+    "todo",
+    "task-management",
+    "express",
+    "mongodb"
+  ],
   "author": "Village Coders",
   "license": "ISC",
   "dependencies": {
@@ -16,6 +21,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.0"
+    "mongoose": "^8.4.0",
+    "nodemailer": "^10.0.10"
   }
 }
