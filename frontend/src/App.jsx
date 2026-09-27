@@ -13,21 +13,27 @@ export default function App() {
       try {
         const stored = getStoredUser();
         if (stored) {
-          const res = await authAPI.getMe().catch(() => null);
-          if (res && res.user) {
-            setCurrentUser(res.user);
-            setStoredUser(res.user);
-          } else {
-            // Account was deleted/wiped or session expired
-            removeAuthToken();
-            setCurrentUser(null);
+          try {
+            const res = await authAPI.getMe();
+            if (res && res.user) {
+              setCurrentUser(res.user);
+              setStoredUser(res.user);
+            }
+          } catch (err) {
+            // ONLY log out if the backend explicitly returned 401 Unauthorized (expired/invalid token)
+            if (err.status === 401) {
+              removeAuthToken();
+              setCurrentUser(null);
+            } else {
+              // Network timeout, cold start, or temporary 5xx: preserve stored user
+              setCurrentUser(stored);
+            }
           }
         } else {
           setCurrentUser(null);
         }
       } catch (e) {
-        removeAuthToken();
-        setCurrentUser(null);
+        // preserve current user if any
       } finally {
         setInitialChecking(false);
       }

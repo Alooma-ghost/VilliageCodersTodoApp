@@ -142,13 +142,28 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
     }
   };
 
+  // Open task modal and instantly re-fetch team members to ensure newly created accounts appear immediately
+  const handleOpenTaskModal = async () => {
+    setIsTaskModalOpen(true);
+    try {
+      const usersRes = await authAPI.getUsers();
+      if (usersRes && Array.isArray(usersRes.users)) {
+        setTeamMembers(usersRes.users);
+      }
+    } catch (_) {}
+  };
+
   // Filter tasks based on UI inputs
   const filteredTasks = tasks.filter((task) => {
+    const myId = (user?._id || user?.id)?.toString();
+    const assigneeId = (task.assignedTo?._id || task.assignedTo?.id || task.assignedTo)?.toString();
+    const assignerId = (task.assignedBy?._id || task.assignedBy?.id || task.assignedBy)?.toString();
+
     // Tab filter
-    if (activeTab === 'assignedToMe' && task.assignedTo?._id !== user._id) {
+    if (activeTab === 'assignedToMe' && assigneeId !== myId) {
       return false;
     }
-    if (activeTab === 'assignedByMe' && task.assignedBy?._id !== user._id) {
+    if (activeTab === 'assignedByMe' && assignerId !== myId) {
       return false;
     }
     if (activeTab === 'blocked' && task.status !== 'Cannot Do') {
@@ -166,11 +181,11 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
     // Search query match
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchTitle = task.title.toLowerCase().includes(q);
+      const matchTitle = task.title?.toLowerCase().includes(q);
       const matchDesc = task.description?.toLowerCase().includes(q);
       const matchReason = task.cannotDoReason?.toLowerCase().includes(q);
-      const matchAssignee = task.assignedTo?.name?.toLowerCase().includes(q);
-      const matchAssigner = task.assignedBy?.name?.toLowerCase().includes(q);
+      const matchAssignee = (task.assignedTo?.name || '').toLowerCase().includes(q);
+      const matchAssigner = (task.assignedBy?.name || '').toLowerCase().includes(q);
       if (!matchTitle && !matchDesc && !matchReason && !matchAssignee && !matchAssigner) {
         return false;
       }
@@ -238,7 +253,7 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
 
               <button
                 className="btn-assign-primary"
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={handleOpenTaskModal}
               >
                 <Plus size={16} />
                 <span>Assign Task</span>
@@ -288,7 +303,7 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
               <button
                 className="btn-assign-primary"
                 style={{ marginTop: '8px' }}
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={handleOpenTaskModal}
               >
                 <Plus size={16} /> Assign a New Task
               </button>
@@ -313,7 +328,7 @@ export default function Dashboard({ user, onLogout, viewMode, setViewMode }) {
         <button
           className="fab-assign"
           title="Quick Assign Task"
-          onClick={() => setIsTaskModalOpen(true)}
+          onClick={handleOpenTaskModal}
         >
           <Plus size={26} />
         </button>

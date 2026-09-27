@@ -1,21 +1,46 @@
-import React, { useState } from 'react';
-import { X, PlusCircle, Calendar, Flag, UserCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, PlusCircle, Calendar, Flag, UserCheck, AlertCircle } from 'lucide-react';
 
 export default function TaskModal({ isOpen, onClose, onSave, teamMembers = [], currentUser }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('Medium');
-  // Default deadline: tomorrow at 5:00 PM
+
+  // Format local deadline: tomorrow at 5:00 PM (local time string for datetime-local)
   const getDefaultDeadline = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     d.setHours(17, 0, 0, 0);
-    return d.toISOString().slice(0, 16);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
+
   const [deadline, setDeadline] = useState(getDefaultDeadline());
-  const [assignedTo, setAssignedTo] = useState(teamMembers[0]?._id || '');
+  const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Automatically sync and pick an initial team member when opened or when members load
+  useEffect(() => {
+    if (isOpen) {
+      setError('');
+      if (teamMembers && teamMembers.length > 0) {
+        const currentMemberValid = teamMembers.some(
+          (m) => (m._id || m.id)?.toString() === assignedTo?.toString()
+        );
+
+        if (!assignedTo || !currentMemberValid) {
+          // If possible, default to currentUser, or to first available teammate
+          const myId = (currentUser?._id || currentUser?.id)?.toString();
+          const me = teamMembers.find((m) => (m._id || m.id)?.toString() === myId);
+          const defaultPick = me || teamMembers[0];
+          if (defaultPick) {
+            setAssignedTo((defaultPick._id || defaultPick.id).toString());
+          }
+        }
+      }
+    }
+  }, [isOpen, teamMembers]);
 
   if (!isOpen) return null;
 
@@ -73,11 +98,13 @@ export default function TaskModal({ isOpen, onClose, onSave, teamMembers = [], c
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="form-group">
-            <label className="form-label">Task Title <span style={{ color: '#ef4444' }}>*</span></label>
+            <label className="form-label">
+              Task Title <span style={{ color: '#ef4444' }}>*</span>
+            </label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g., Implement MongoDB Schema & Auth Middleware"
+              placeholder="e.g., Implement Authentication & Workflow Integration"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -131,19 +158,31 @@ export default function TaskModal({ isOpen, onClose, onSave, teamMembers = [], c
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <UserCheck size={14} color="#10b981" /> Assign To Teammate <span style={{ color: '#ef4444' }}>*</span>
             </label>
-            <select
-              className="form-select"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              required
-            >
-              <option value="" disabled>Select team member...</option>
-              {teamMembers.map((member) => (
-                <option key={member._id} value={member._id}>
-                  {member.name} ({member.role === 'Boss' ? 'Team Lead' : (member.title || 'Developer')}) - {member.email}
-                </option>
-              ))}
-            </select>
+
+            {teamMembers.length === 0 ? (
+              <div style={{ fontSize: '0.82rem', color: '#f59e0b', padding: '8px', background: 'rgba(245,158,11,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={16} />
+                <span>Loading team members...</span>
+              </div>
+            ) : (
+              <select
+                className="form-select"
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                required
+              >
+                <option value="" disabled>Select team member...</option>
+                {teamMembers.map((member) => {
+                  const mId = (member._id || member.id)?.toString();
+                  const isMe = mId === (currentUser?._id || currentUser?.id)?.toString();
+                  return (
+                    <option key={mId} value={mId}>
+                      {member.name} ({member.role === 'Boss' ? 'Team Lead' : (member.title || 'Developer')}) {isMe ? '— (You)' : ''} - {member.email}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
           </div>
 
           <div className="modal-footer">
@@ -158,7 +197,7 @@ export default function TaskModal({ isOpen, onClose, onSave, teamMembers = [], c
             <button
               type="submit"
               className="btn-assign-primary"
-              disabled={saving}
+              disabled={saving || teamMembers.length === 0}
             >
               {saving ? 'Assigning...' : 'Assign Task'}
             </button>

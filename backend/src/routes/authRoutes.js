@@ -67,14 +67,21 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// @route   ALL /api/auth/reset-database
-// Allows wiping test data from both MongoDB and local storage to start completely afresh
-router.all('/reset-database', async (req, res) => {
+// @route   POST /api/auth/reset-database
+// Explicit emergency reset only with secret key to prevent bots/crawlers/accidental wipes
+router.post('/reset-database', async (req, res) => {
+  const adminSecret = req.headers['x-reset-secret'] || req.query.secret;
+  if (adminSecret !== 'village_wipe_test_data_confirm') {
+    return res.status(403).json({
+      success: false,
+      message: 'Unauthorized. Emergency reset requires correct administrative verification secret.',
+    });
+  }
   try {
     const result = await store.clearAllData();
     res.json({
       success: true,
-      message: 'Database wiped clean successfully. All test accounts and tasks have been removed.',
+      message: 'Database wiped clean successfully.',
       ...result,
     });
   } catch (err) {

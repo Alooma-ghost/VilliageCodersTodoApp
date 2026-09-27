@@ -21,8 +21,12 @@ export default function TaskCard({
   onOpenCannotDoModal,
   onDeleteTask,
 }) {
-  const isAssignee = task.assignedTo?._id === currentUser?._id;
-  const isAssigner = task.assignedBy?._id === currentUser?._id;
+  const myId = (currentUser?._id || currentUser?.id)?.toString();
+  const assigneeId = (task.assignedTo?._id || task.assignedTo?.id || task.assignedTo)?.toString();
+  const assignerId = (task.assignedBy?._id || task.assignedBy?.id || task.assignedBy)?.toString();
+
+  const isAssignee = !!(myId && assigneeId === myId);
+  const isAssigner = !!(myId && assignerId === myId);
   const isBoss = currentUser?.role === 'Boss';
 
   // Deadline formatting & overdue calculation
